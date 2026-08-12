@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 xl:grid-cols-4 gap-6 h-full items-stretch">
+    <div class="xl:col-span-1 flex flex-col space-y-4">
+        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-5 space-y-4 flex flex-col shadow-xl">
+            <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">Market Settings</h2>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1.5">Synthetic Index Underlier</label>
+                <select id="assetSelector" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition">
+                    <option value="1HZ10V" selected>Volatility 10 Index</option>
+                    <option value="1HZ50V">Volatility 50 Index</option>
+                    <option value="1HZ100V">Volatility 100 Index</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1.5">Trade Stake Volume ($)</label>
+                <input id="tradeStake" type="number" value="1.00" step="0.50" min="0.35" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition font-mono">
+            </div>
+            <div class="pt-2 border-t border-slate-800/60">
+                <div class="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800/50">
+                    <div>
+                        <span class="block text-xs font-bold text-slate-300">Algorithmic Bot Cycle</span>
+                        <span class="text-[10px] text-slate-500">Executes automated strategy formulas</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer select-none">
+                        <input id="botToggle" type="checkbox" class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-5 grid grid-cols-2 gap-3 shadow-xl">
+            <button id="btnRise" class="bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition p-4 rounded-xl text-center text-white font-bold">Rise / Call</button>
+            <button id="btnFall" class="bg-rose-600 hover:bg-rose-500 active:scale-[0.98] transition p-4 rounded-xl text-center text-white font-bold">Fall / Put</button>
+        </div>
+    </div>
+    <div class="xl:col-span-3 flex flex-col space-y-4 min-h-[500px]">
+        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex-1 flex flex-col shadow-xl relative">
+            <div class="flex items-center justify-between mb-3 px-2">
+                <div class="flex items-center space-x-3">
+                    <span id="chartSymbolDisplay" class="text-sm font-bold tracking-wider text-slate-200 uppercase font-mono">VOLATILITY 10 INDEX</span>
+                    <span id="livePriceDisplay" class="text-sm font-mono font-extrabold text-slate-400">0.0000</span>
+                </div>
+            </div>
+            <div id="chartContainer" class="flex-1 w-full min-h-[320px] rounded-lg bg-slate-950 border border-slate-900"></div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 h-44 flex flex-col shadow-xl">
+            <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-800/80">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">System Execution Terminal Log</h3>
+                <button id="btnClearLogs" class="text-[10px] text-slate-500 hover:text-indigo-400 uppercase font-semibold">Flush Logs</button>
+            </div>
+            <div id="terminalLog" class="flex-1 overflow-y-auto font-mono text-xs text-slate-400 space-y-1 bg-slate-950 p-2.5 rounded-lg border border-slate-900">
+                <div class="text-slate-500 italic">Ready...</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="/static/js/app.js"></script>
+{% endblock %}
