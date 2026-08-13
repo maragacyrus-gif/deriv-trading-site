@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trading Engine Platform</title>
     <!-- Tailwind CSS Engine for Dashboard Styling -->
-    <script src="/static/js/app.js"></script>
+    <link href="https://jsdelivr.net" rel="stylesheet">
+    
         
     <!-- Lightweight Charts (TradingView) for Data Visualization Layouts -->
-    <script src="/static/js/app.js"></script>
+    <link href="https://jsdelivr.net" rel="stylesheet">
     
+
 </head>
 <body class="bg-[#0b0f19] text-slate-200 font-sans min-h-screen pb-8">
 
