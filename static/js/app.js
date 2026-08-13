@@ -13,7 +13,8 @@ let lastSimulatedTradeDirection = null;
 let mockTradeEntryPrice = 0.00;
 let totalBotTradesExecuted = 0;
 let globalBotProfitLossState = 0.00;
-
+const DERIV_APP_ID = "346c9D1uSj4VDAZKWHnTM"; 
+const DERIV_WS_URL = `wss://://derivws.com{DERIV_APP_ID}`;
 document.addEventListener("DOMContentLoaded", () => {
     logTerminalEntry("Initializing platform core components...", "system");
     initializeChartingWindow();
