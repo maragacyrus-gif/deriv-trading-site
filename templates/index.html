@@ -1,73 +1,151 @@
-{% extends "base.html" %}
-{% block content %}
-<style>
-    .grid-container { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 1100px) { .grid-container { grid-template-columns: 1fr 3fr; } }
-    .card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    .panel-title { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
-    label { font-size: 0.75rem; color: #94a3b8; font-weight: 600; }
-    select, input { w-full: 100%; width: 100%; background-color: #020617; border: 1px solid #1e293b; color: #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 0.875rem; margin-top: 4px; }
-    .bot-box { background-color: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
-    .bot-text span { display: block; font-size: 0.75rem; font-weight: 700; }
-    .bot-text small { color: #64748b; font-size: 10px; }
-    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .btn-action { padding: 12px; border: none; border-radius: 12px; font-weight: 700; color: white; cursor: pointer; text-transform: uppercase; font-size: 0.75rem; }
-    .btn-rise { background-color: #10b981; }
-    .btn-fall { background-color: #f43f5e; }
-    .chart-panel { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
-    .chart-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.875rem; }
-    #livePriceDisplay { font-family: monospace; color: #94a3b8; font-weight: 800; }
-    #chartContainer { width: 100%; min-height: 350px; background-color: #020617; border: 1px solid #0f172a; border-radius: 8px; }
-    .log-panel { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; height: 180px; display: flex; flex-direction: column; }
-    #terminalLog { flex: 1; overflow-y: auto; background-color: #020617; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Engine Platform</title>
+    <!-- Tailwind CSS Engine for Dashboard Styling -->
+    <script src="https://jsdelivr.net"></script>
+    <!-- Lightweight Charts (TradingView) for Data Visualization Layouts -->
+    <script src="https://unpkg.com"></script>
+</head>
+<body class="bg-[#0b0f19] text-slate-200 font-sans min-h-screen pb-8">
 
-<div class="grid-container">
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-        <div class="card">
-            <div class="panel-title">Market Settings</div>
-            <div>
-                <label>Synthetic Index Underlier</label>
-                <select id="assetSelector">
-                    <option value="1HZ10V" selected>Volatility 10 Index</option>
-                    <option value="1HZ50V">Volatility 50 Index</option>
-                    <option value="1HZ100V">Volatility 100 Index</option>
+    <!-- ========================================== -->
+    <!-- 1. NAVIGATION HEADER SECTION               -->
+    <!-- ========================================== -->
+    <header class="max-w-md mx-auto px-4 pt-4 flex flex-col items-center justify-between border-b border-slate-800/50 pb-3">
+        <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-2">
+                <span class="text-xl font-black tracking-wider text-white">QUANTUM<span class="text-indigo-500">TRADE</span></span>
+            </div>
+            <!-- Dynamic Connection State Tracker Tag Component -->
+            <div class="text-xs text-slate-400">
+                Network: <span id="connectionStatus" class="text-rose-500 font-bold transition-all duration-300">Offline</span>
+            </div>
+        </div>
+
+        <!-- Secure Token Linking Pipeline Action Gateway Trigger -->
+        <button id="connectBtn" class="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all duration-150 text-sm">
+            Link Deriv Account (OAuth2)
+        </button>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- 2. CONTROL PANEL MAIN WRAPPER CONTAINER     -->
+    <!-- ========================================== -->
+    <main class="max-w-md mx-auto px-4 mt-4 space-y-4">
+        
+        <!-- Market Configuration Structural Module Grid Element -->
+        <section class="bg-[#131a2a] border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-4">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-2">Market Settings</h2>
+            
+            <!-- Underlying Asset Focus Selection Interface Dropdown Component -->
+            <div class="space-y-1.5">
+                <label for="assetSelector" class="text-xs font-medium text-slate-400">Synthetic Index Underlier</label>
+                <select id="assetSelector" class="w-full bg-[#1c263c] border border-slate-700/60 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer appearance-none">
+                    <option value="">-- Choose Asset Index --</option>
+                    <option value="R_10" selected>Volatility 10 Index</option>
+                    <option value="R_25">Volatility 25 Index</option>
+                    <option value="R_50">Volatility 50 Index</option>
+                    <option value="R_75">Volatility 75 Index</option>
+                    <option value="R_100">Volatility 100 Index</option>
                 </select>
             </div>
-            <div>
-                <label>Trade Stake Volume ($)</label>
-                <input id="tradeStake" type="number" value="1.00" step="0.50">
-            </div>
-            <div class="bot-box">
-                <div class="bot-text">
-                    <span>Algorithmic Bot Cycle</span>
-                    <small>Executes automated rules</small>
+
+            <!-- Capital Target Stake Volume Quantitative Allocation Node Input Component -->
+            <div class="space-y-1.5">
+                <label for="stakeVolumeInput" class="text-xs font-medium text-slate-400">Trade Stake Volume ($)</label>
+                <div class="relative">
+                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
+                    <input type="number" id="stakeVolumeInput" value="1.00" min="0.35" step="0.50" class="w-full bg-[#1c263c] border border-slate-700/60 rounded-xl pl-8 pr-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 transition-colors">
                 </div>
-                <input id="botToggle" type="checkbox" style="width: auto; margin: 0; cursor: pointer;">
             </div>
-        </div>
-        <div class="btn-row">
-            <button id="btnRise" class="btn-action btn-rise">Rise / Call</button>
-            <button id="btnFall" class="btn-action btn-fall">Fall / Put</button>
-        </div>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-        <div class="chart-panel">
-            <div class="chart-header">
-                <span id="chartSymbolDisplay">VOLATILITY 10 INDEX</span>
-                <span id="livePriceDisplay">0.0000</span>
+
+            <!-- Automator Loop Execution Parameter Slider System State Checkbox Component -->
+            <div class="bg-[#1c263c]/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-white">Algorithmic Bot Cycle</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Executes automated rules on market intervals</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer select-none">
+                    <input type="checkbox" id="botToggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
             </div>
-            <div id="chartContainer"></div>
-        </div>
-        <div class="log-panel">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: center;">
-                <label class="panel-title" style="border:none; padding:0;">System Log</label>
-                <button id="btnClearLogs" style="background: none; border: none; color: #64748b; font-size: 10px; cursor: pointer;">Flush Logs</button>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 3. INTERFACE MANUAL DISPATCH BUTTON GRID   -->
+        <!-- ========================================== -->
+        <section class="grid grid-cols-2 gap-3">
+            <button id="riseBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-500/10 active:scale-[0.97] transition-all duration-150 uppercase tracking-wider text-xs">
+                Rise / Call
+            </button>
+            <button id="fallBtn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-rose-500/10 active:scale-[0.97] transition-all duration-150 uppercase tracking-wider text-xs">
+                Fall / Put
+            </button>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 4. REAL-TIME DATA STREAM & CHART CANVAS    -->
+        <!-- ========================================== -->
+        <section class="bg-[#131a2a] border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h2 id="assetNameDisplay" class="text-xs font-bold text-slate-400 uppercase tracking-widest">Volatility 10 Index</h2>
+                <div id="livePriceDisplay" class="font-mono text-sm font-bold text-indigo-400 tracking-wider">0.0000</div>
             </div>
-            <div id="terminalLog"></div>
-        </div>
-    </div>
-</div>
-<script src="/static/js/app.js"></script>
-{% endblock %}
             
+            <!-- Real-Time Visualization Vector Drawing Target Panel Holder Window Component Container Hook Element -->
+            <div id="chartContainer" class="w-full h-56 bg-[#0e1422] rounded-xl overflow-hidden border border-slate-800/40 relative">
+                <!-- If not using charting tools yet, this serves as a clean canvas placeholder frame layout -->
+                <div class="absolute inset-0 flex items-center justify-between text-xs text-slate-500 px-8 pointer-events-none">
+                    <span>Live Market Pipeline Visualization Canvas Matrix</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 5. TERMINAL MONITOR LOG EXECUTOR COMPONENT -->
+        <!-- ========================================== -->
+        <section class="bg-[#131a2a] border border-slate-800/80 rounded-2xl p-4 shadow-xl space-y-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">System Execution Logger</span>
+                <button id="clearLogBtn" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-1 rounded transition-colors uppercase font-semibold tracking-wider">
+                    Clear Log
+                </button>
+            </div>
+            <!-- Log Console Body Window -->
+            <div id="terminalLog" class="w-full h-32 bg-[#0b0f19] rounded-xl p-3 font-mono text-[11px] overflow-y-auto space-y-1 border border-slate-800/50 scroll-smooth">
+                <div class="text-indigo-400">[SYSTEM] Initialization lifecycle waiting for core network boot thread activation...</div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- 6. APPLICATION COMPLIANCE CHARTING LOGIC   -->
+    <!-- ========================================== -->
+    <script>
+        // Setup a baseline visual framework chart on element compilation
+        document.addEventListener("DOMContentLoaded", () => {
+            const chartElement = document.getElementById('chartContainer');
+            if (chartElement && typeof LightweightCharts !== 'undefined') {
+                const chart = LightweightCharts.createChart(chartElement, {
+                    layout: { backgroundColor: '#0e1422', textColor: '#64748b' },
+                    grid: { vertLines: { color: '#1e293b/20' }, horzLines: { color: '#1e293b/20' } },
+                    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                    rightPriceScale: { borderColor: '#1e293b' },
+                    timeScale: { borderColor: '#1e293b', timeVisible: true, secondsVisible: true }
+                });
+                // Expose target dataset memory pipeline globally to be caught by app.js stream loops
+                window.masterDataSeries = chart.addAreaSeries({
+                    topColor: 'rgba(99, 102, 241, 0.2)',
+                    bottomColor: 'rgba(99, 102, 241, 0.0)',
+                    lineColor: 'rgba(99, 102, 241, 1)',
+                    lineWidth: 2,
+                });
+                
+                // Adjust chart frame wrapper parameters automatically on device display scale shifts
+                const resizeObserver = new ResizeObserver(entries => {
+                    
