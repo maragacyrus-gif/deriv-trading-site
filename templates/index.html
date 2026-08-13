@@ -1,59 +1,73 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="grid grid-cols-1 xl:grid-cols-4 gap-6 h-full items-stretch">
-    <div class="xl:col-span-1 flex flex-col space-y-4">
-        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-5 space-y-4 flex flex-col shadow-xl">
-            <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">Market Settings</h2>
+<style>
+    .grid-container { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 1100px) { .grid-container { grid-template-columns: 1fr 3fr; } }
+    .card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .panel-title { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+    label { font-size: 0.75rem; color: #94a3b8; font-weight: 600; }
+    select, input { w-full: 100%; width: 100%; background-color: #020617; border: 1px solid #1e293b; color: #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 0.875rem; margin-top: 4px; }
+    .bot-box { background-color: #020617; padding: 12px; border-radius: 8px; border: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
+    .bot-text span { display: block; font-size: 0.75rem; font-weight: 700; }
+    .bot-text small { color: #64748b; font-size: 10px; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn-action { padding: 12px; border: none; border-radius: 12px; font-weight: 700; color: white; cursor: pointer; text-transform: uppercase; font-size: 0.75rem; }
+    .btn-rise { background-color: #10b981; }
+    .btn-fall { background-color: #f43f5e; }
+    .chart-panel { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .chart-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.875rem; }
+    #livePriceDisplay { font-family: monospace; color: #94a3b8; font-weight: 800; }
+    #chartContainer { width: 100%; min-height: 350px; background-color: #020617; border: 1px solid #0f172a; border-radius: 8px; }
+    .log-panel { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; height: 180px; display: flex; flex-direction: column; }
+    #terminalLog { flex: 1; overflow-y: auto; background-color: #020617; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
+</style>
+
+<div class="grid-container">
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="card">
+            <div class="panel-title">Market Settings</div>
             <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1.5">Synthetic Index Underlier</label>
-                <select id="assetSelector" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition">
+                <label>Synthetic Index Underlier</label>
+                <select id="assetSelector">
                     <option value="1HZ10V" selected>Volatility 10 Index</option>
                     <option value="1HZ50V">Volatility 50 Index</option>
                     <option value="1HZ100V">Volatility 100 Index</option>
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1.5">Trade Stake Volume ($)</label>
-                <input id="tradeStake" type="number" value="1.00" step="0.50" min="0.35" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 transition font-mono">
+                <label>Trade Stake Volume ($)</label>
+                <input id="tradeStake" type="number" value="1.00" step="0.50">
             </div>
-            <div class="pt-2 border-t border-slate-800/60">
-                <div class="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800/50">
-                    <div>
-                        <span class="block text-xs font-bold text-slate-300">Algorithmic Bot Cycle</span>
-                        <span class="text-[10px] text-slate-500">Executes automated strategy formulas</span>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer select-none">
-                        <input id="botToggle" type="checkbox" class="sr-only peer">
-                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
-                    </label>
+            <div class="bot-box">
+                <div class="bot-text">
+                    <span>Algorithmic Bot Cycle</span>
+                    <small>Executes automated rules</small>
                 </div>
+                <input id="botToggle" type="checkbox" style="width: auto; margin: 0; cursor: pointer;">
             </div>
         </div>
-        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-5 grid grid-cols-2 gap-3 shadow-xl">
-            <button id="btnRise" class="bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition p-4 rounded-xl text-center text-white font-bold">Rise / Call</button>
-            <button id="btnFall" class="bg-rose-600 hover:bg-rose-500 active:scale-[0.98] transition p-4 rounded-xl text-center text-white font-bold">Fall / Put</button>
+        <div class="btn-row">
+            <button id="btnRise" class="btn-action btn-rise">Rise / Call</button>
+            <button id="btnFall" class="btn-action btn-fall">Fall / Put</button>
         </div>
     </div>
-    <div class="xl:col-span-3 flex flex-col space-y-4 min-h-[500px]">
-        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 flex-1 flex flex-col shadow-xl relative">
-            <div class="flex items-center justify-between mb-3 px-2">
-                <div class="flex items-center space-x-3">
-                    <span id="chartSymbolDisplay" class="text-sm font-bold tracking-wider text-slate-200 uppercase font-mono">VOLATILITY 10 INDEX</span>
-                    <span id="livePriceDisplay" class="text-sm font-mono font-extrabold text-slate-400">0.0000</span>
-                </div>
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="chart-panel">
+            <div class="chart-header">
+                <span id="chartSymbolDisplay">VOLATILITY 10 INDEX</span>
+                <span id="livePriceDisplay">0.0000</span>
             </div>
-            <div id="chartContainer" class="flex-1 w-full min-h-[320px] rounded-lg bg-slate-950 border border-slate-900"></div>
+            <div id="chartContainer"></div>
         </div>
-        <div class="bg-slate-900 border border-slate-800/80 rounded-xl p-4 h-44 flex flex-col shadow-xl">
-            <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-800/80">
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">System Execution Terminal Log</h3>
-                <button id="btnClearLogs" class="text-[10px] text-slate-500 hover:text-indigo-400 uppercase font-semibold">Flush Logs</button>
+        <div class="log-panel">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: center;">
+                <label class="panel-title" style="border:none; padding:0;">System Log</label>
+                <button id="btnClearLogs" style="background: none; border: none; color: #64748b; font-size: 10px; cursor: pointer;">Flush Logs</button>
             </div>
-            <div id="terminalLog" class="flex-1 overflow-y-auto font-mono text-xs text-slate-400 space-y-1 bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                <div class="text-slate-500 italic">Ready...</div>
-            </div>
+            <div id="terminalLog"></div>
         </div>
     </div>
 </div>
 <script src="/static/js/app.js"></script>
 {% endblock %}
+            
