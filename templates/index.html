@@ -1,17 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trading Engine Platform</title>
-    <!-- Tailwind CSS Engine for Dashboard Styling -->
-    <link href="https://jsdelivr.net" rel="stylesheet">
-    
-        
-    <!-- Lightweight Charts (TradingView) for Data Visualization Layouts -->
-    <link href="https://jsdelivr.net" rel="stylesheet">
-    
-
+    <!-- Tailwind Play CDN for Active Engine Theme Styling -->
+    <script src="https://tailwindcss.com"></script>
+    <!-- Lightweight Charts (TradingView) for Stream Data Visualization -->
+    <script src="https://unpkg.com"></script>
 </head>
 <body class="bg-[#0b0f19] text-slate-200 font-sans min-h-screen pb-8">
 
@@ -102,8 +99,7 @@
             
             <!-- Real-Time Visualization Vector Drawing Target Panel Holder Window Component Container Hook Element -->
             <div id="chartContainer" class="w-full h-56 bg-[#0e1422] rounded-xl overflow-hidden border border-slate-800/40 relative">
-                <!-- If not using charting tools yet, this serves as a clean canvas placeholder frame layout -->
-                <div class="absolute inset-0 flex items-center justify-between text-xs text-slate-500 px-8 pointer-events-none">
+                <div class="absolute inset-0 flex items-center justify-center text-xs text-slate-500 px-8 pointer-events-none">
                     <span>Live Market Pipeline Visualization Canvas Matrix</span>
                 </div>
             </div>
@@ -131,7 +127,6 @@
     <!-- 6. APPLICATION COMPLIANCE CHARTING LOGIC   -->
     <!-- ========================================== -->
     <script>
-        // Setup a baseline visual framework chart on element compilation
         document.addEventListener("DOMContentLoaded", () => {
             const chartElement = document.getElementById('chartContainer');
             if (chartElement && typeof LightweightCharts !== 'undefined') {
@@ -142,7 +137,7 @@
                     rightPriceScale: { borderColor: '#1e293b' },
                     timeScale: { borderColor: '#1e293b', timeVisible: true, secondsVisible: true }
                 });
-                // Expose target dataset memory pipeline globally to be caught by app.js stream loops
+                
                 window.masterDataSeries = chart.addAreaSeries({
                     topColor: 'rgba(99, 102, 241, 0.2)',
                     bottomColor: 'rgba(99, 102, 241, 0.0)',
@@ -150,6 +145,15 @@
                     lineWidth: 2,
                 });
                 
-                // Adjust chart frame wrapper parameters automatically on device display scale shifts
                 const resizeObserver = new ResizeObserver(entries => {
-                    
+                    for (let entry of entries) {
+                        chart.resize(entry.contentRect.width, entry.contentRect.height);
+                    }
+                });
+                resizeObserver.observe(chartElement);
+            }
+            
+            const selector = document.getElementById("assetSelector");
+            if (selector) {
+                selector.addEventListener("change", (e) => {
+    
