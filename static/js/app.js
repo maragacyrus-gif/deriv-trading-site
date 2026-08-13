@@ -64,7 +64,7 @@ function establishWebSocketConnection() {
         if (userIsAuthenticated && sessionAuthorizedToken) {
             socketInstance.send(JSON.stringify({ authorize: sessionAuthorizedToken }));
         }
-        synchronizeMarketDataStreams();
+        synchronizeMarketDataStreams(346c9D1uSj4VDAZKWHnTM);
     };
     socketInstance.onmessage = (rawPayloadPacket) => {
         processIncomingAPIFrame(JSON.parse(rawPayloadPacket.data));
@@ -95,7 +95,7 @@ function bindUserInterfaceInteractionHandlers() {
     });
 }
 
-function synchronizeMarketDataStreams() {
+function synchronizeMarketDataStreams(346c9D1uSj4VDAZKWHnTM) {
     if (!socketInstance || socketInstance.readyState !== WebSocket.OPEN) return;
     const assetSel = document.getElementById("assetSelector");
     if (!assetSel) return;
