@@ -1,232 +1,178 @@
 // ==========================================
-// 1. GLOBAL STATE INITIALIZATION
+// ⚙️ DEFENSIVE CONFIGURATION & IDENTITY MATCH
 // ==========================================
-let systemExecutionSequenceCounter = 0;
-let lastSimulatedTradeDirection = null;
-let mockTradeEntryPrice = 0;
-let globalBotProfitLossState = 0;
-let ongoingAlgorithmicStake = 1.00; // Default fallback stake volume
-let baselineUserStake = 1.00;
-let totalBotTradesExecuted = 0;
-let liveSubscribedSymbolToken = null;
-let socketInstance = null;
-let masterDataSeries = null; // Target hook for Lightweight Charts
+const DERIV_APP_ID = '346c9D1uSj4VDAZKWHnTM'; 
+const DERIV_API_TOKEN = 'pat_523b5c4a31cb6f052cfd9349f0793118ffca9685695f88fbcf949f47e013103a'; 
 
-// Your authentic Deriv App ID registered from your developer portal
-const DERIV_APP_ID = "346c9D1uSj4VDAZKWHnTM"; 
-const DERIV_WS_URL = `wss://://derivws.com{DERIV_APP_ID}`;
-const MAX_MARTINGALE_STREAK = 6; // Safety barrier to protect account balances
+const symbol = 'R_100';        // Volatility 100 Index
+const BASE_UNIT = 0.35;        // Lowest allowed stake to minimize risk (e.g., $0.35 USD)
+
+// Hard Circuit Breakers (Protection Guardrails)
+const TARGET_PROFIT = 2.00;    // Conservatively take profit early and stop
+const MAX_LOSS_LIMIT = -1.05;  // Hard stop-loss (stops the bot after 3 consecutive structural losses)
+const COOLDOWN_PERIOD = 15000; // Force a 15-second pause between trades to clear emotional/volatile spikes
 
 // ==========================================
-// 2. NETWORK CONNECTION & PIPELINE ENGINE
+// 📊 CONSERVATIVE CYCLE MANAGEMENT STATE
 // ==========================================
-function establishLiveDerivConnection() {
-    logTerminalEntry("Opening secure connection pipeline to Deriv exchanges...", "bot");
-    socketInstance = new WebSocket(DERIV_WS_URL);
+const unitPattern =; 
+let cycleIndex = 0;              
+let currentStake = BASE_UNIT * unitPattern[cycleIndex];
 
-    socketInstance.onmessage = function(event) {
-        processIncomingAPIFrame(event);
-    };
+let lastPrice = null;
+let consecutiveUpTicks = 0;
+let consecutiveDownTicks = 0;
+let isTrading = false;
+let onCooldown = false;
+let totalProfitLoss = 0.00;
 
-    socketInstance.onopen = function() {
-        logTerminalEntry("Network connection stabilized. Checking for active account keys...", "success");
-        updateNetworkStatusIndicator(true); 
-    };
+// Connect via WebSockets
+const ws = new WebSocket(`wss://://derivws.com{DERIV_APP_ID}`);
 
-    socketInstance.onclose = function() {
-        logTerminalEntry("Network channel disconnected. Auto-reconnecting in 5 seconds...", "error");
-        updateNetworkStatusIndicator(false); 
-        setTimeout(establishLiveDerivConnection, 5000);
-    };
-}
+ws.onopen = () => {
+    console.log('🏁 WebSocket Connected. Processing Token Authorization...');
+    ws.send(JSON.stringify({ authorize: DERIV_API_TOKEN }));
+};
 
-// ==========================================
-// 3. SECURE AUTHENTICATION EXTRACTION
-// ==========================================
-function getDerivTokenFromURL() {
-    const hash = window.location.hash;
-    if (!hash) return null;
+ws.onmessage = (message) => {
+    const data = JSON.parse(message.data);
 
-    const params = new URLSearchParams(hash.substring(1));
-    return params.get('token1'); 
-}
-
-// ==========================================
-// 4. INTERFACE EVENT MATRIX LISTENERS
-// ==========================================
-function initializeUIEventListeners() {
-    const assetSel = document.getElementById("assetSelector");
-    const clrLog = document.getElementById("clearLogBtn");
-    const bRise = document.getElementById("riseBtn");
-    const bFall = document.getElementById("fallBtn");
-    const bConn = document.getElementById("connectBtn");
-
-    if (assetSel) assetSel.addEventListener("change", synchronizeMarketDataStreams);
-    
-    if (clrLog) clrLog.addEventListener("click", () => {
-        const term = document.getElementById("terminalLog");
-        if (term) term.innerHTML = "";
-    });
-    
-    // Wire up manual buy/sell buttons to dispatch real contracts
-    if (bRise) bRise.addEventListener("click", () => executeLiveOrderContract("RISE"));
-    if (bFall) bFall.addEventListener("click", () => executeLiveOrderContract("FALL"));
-    
-    if (bConn) bConn.addEventListener("click", () => {
-        logTerminalEntry("Redirecting user safely to Deriv secure OAuth2 clearing screen...", "bot");
-        window.location.href = `https://deriv.com{DERIV_APP_ID}&l=en&brand=deriv`;
-    });
-}
-
-// ==========================================
-// 5. ASYNC MARKET FEED ROUTING
-// ==========================================
-function synchronizeMarketDataStreams() {
-    if (!socketInstance || socketInstance.readyState !== WebSocket.OPEN) {
-        logTerminalEntry("Error: Cannot stream market feeds while network is offline.", "error");
-        return;
-    }
-    const assetSel = document.getElementById("assetSelector");
-    if (!assetSel) return;
-    const chosenSymbolString = assetSel.value;
-    
-    if (liveSubscribedSymbolToken) {
-        socketInstance.send(JSON.stringify({ forget_all: "ticks" }));
-        if (masterDataSeries) masterDataSeries.setData([]);
-    }
-    
-    liveSubscribedSymbolToken = chosenSymbolString;
-    socketInstance.send(JSON.stringify({ ticks: chosenSymbolString, subscribe: 1 }));
-    logTerminalEntry(`Switched data streams to asset asset ticker focus: ${chosenSymbolString}`, "bot");
-}
-
-// ==========================================
-// 6. SERVER PACKET DECODING & ANALYSIS
-// ==========================================
-function processIncomingAPIFrame(event) {
-    const dataFrame = JSON.parse(event.data);
-
-    if (dataFrame.error) {
-        logTerminalEntry(`Error: ${dataFrame.error.message}`, "error");
-        return;
-    }
-    
-    if (dataFrame.msg_type === "authorize") {
-        logTerminalEntry(`Auth Success: ${dataFrame.authorize.email} | Bal: $${dataFrame.authorize.balance}`, "success");
-        return;
-    }
-
-    // Capture contract purchase feedback from the server
-    if (dataFrame.msg_type === "buy") {
-        logTerminalEntry(`Contract Purchased Successfully! ID: ${dataFrame.buy.contract_id} | Balance: $${dataFrame.buy.balance_after}`, "success");
-        return;
-    }
-    
-    if (dataFrame.msg_type === "tick" && dataFrame.tick.symbol === liveSubscribedSymbolToken) {
-        const tick = dataFrame.tick;
-        const livePrice = document.getElementById("livePriceDisplay");
-        if (livePrice) livePrice.innerText = tick.quote.toFixed(4);
-        
-        if (masterDataSeries) masterDataSeries.update({ time: tick.epoch, value: tick.quote });
-        
-        const botTog = document.getElementById("botToggle");
-        if (botTog && botTog.checked) {
-            processAutomatedStrategyLoop(tick.quote);
+    // 1. Authorization Callback
+    if (data.msg_type === 'authorize') {
+        if (data.error) {
+            console.error('❌ Authentication Failure:', data.error.message);
+            return;
         }
-    }
-}
-
-// ==========================================
-// 7. LIVE TRANSACTION DISPATCH ENGINE
-// ==========================================
-function executeLiveOrderContract(direction) {
-    if (!socketInstance || socketInstance.readyState !== WebSocket.OPEN) {
-        logTerminalEntry("Execution failed: Network connection is down.", "error");
-        return;
+        console.log(`✅ Authenticated! Safe Mode Active. Starting ${symbol} Ticks...`);
+        ws.send(JSON.stringify({ ticks: symbol }));
     }
 
-    // Determine target market ticker asset or default to Volatility 10 Index
-    const assetSel = document.getElementById("assetSelector");
-    const operationalTargetSymbol = assetSel ? assetSel.value : "R_10";
-
-    // Pull custom stake value entered on screen
-    const userStakeInput = document.getElementById("stakeVolumeInput"); 
-    if (userStakeInput && !isNaN(parseFloat(userStakeInput.value))) {
-        baselineUserStake = parseFloat(userStakeInput.value);
-    }
-
-    logTerminalEntry(`[ORDER] Transmitting real contract request: ${direction} via WebSocket...`, "bot");
-
-    // Constructing the exact payload parameters requested by the Deriv API schema
-    const orderPayload = {
-        buy: 1,
-        price: ongoingAlgorithmicStake,
-        parameters: {
-            amount: ongoingAlgorithmicStake,
-            basis: "stake",
-            contract_type: direction === "RISE" ? "CALL" : "PUT",
-            currency: "USD",
-            duration: 1,
-            duration_unit: "t", // 't' runs a hyper-fast 1-tick trade contract execution
-            symbol: operationalTargetSymbol
-        }
-    };
-
-    socketInstance.send(JSON.stringify(orderPayload));
-}
-
-// ==========================================
-// 8. ALGORITHMIC BOT STRATEGY EXECUTION
-// ==========================================
-function processAutomatedStrategyLoop(activePrice) {
-    systemExecutionSequenceCounter++;
-    
-    // Evaluates local logic matrices and submits market trades every 10 ticks
-    if (systemExecutionSequenceCounter % 10 === 0) {
-        if (lastSimulatedTradeDirection !== null && mockTradeEntryPrice !== 0) {
-            const pricingDelta = activePrice - mockTradeEntryPrice;
-            let win = (lastSimulatedTradeDirection === "RISE" && pricingDelta > 0) || 
-                      (lastSimulatedTradeDirection === "FALL" && pricingDelta < 0);
-            
-            if (win) {
-                globalBotProfitLossState += ongoingAlgorithmicStake * 0.95; 
-                logTerminalEntry(`[WIN] +$${(ongoingAlgorithmicStake * 0.95).toFixed(2)}. Net Balance: $${globalBotProfitLossState.toFixed(2)}`, "success");
-                ongoingAlgorithmicStake = baselineUserStake; 
-            } else {
-                globalBotProfitLossState -= ongoingAlgorithmicStake;
-                logTerminalEntry(`[LOSS] -$${ongoingAlgorithmicStake.toFixed(2)}. Net Balance: $${globalBotProfitLossState.toFixed(2)}`, "error");
-                
-                if (ongoingAlgorithmicStake >= (baselineUserStake * Math.pow(2, MAX_MARTINGALE_STREAK))) {
-                    logTerminalEntry(`[⚠️ RISK SHIELD] Maximum loss cap hit. Resetting stake to avoid margin liquidation.`, "error");
-                    ongoingAlgorithmicStake = baselineUserStake;
-                } else {
-                    ongoingAlgorithmicStake *= 2; 
-                    logTerminalEntry(`[MARTINGALE] Bot multiplied stake size target to: $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
-                }
+    // 2. High-Threshold Technical Filter
+    if (data.msg_type === 'tick') {
+        const currentPrice = data.tick.quote;
+        
+        if (lastPrice !== null) {
+            if (currentPrice > lastPrice) {
+                consecutiveUpTicks++;
+                consecutiveDownTicks = 0;
+            } else if (currentPrice < lastPrice) {
+                consecutiveDownTicks++;
+                consecutiveUpTicks = 0;
             }
         }
         
-        lastSimulatedTradeDirection = Math.random() > 0.5 ? "RISE" : "FALL";
-        mockTradeEntryPrice = activePrice;
-        totalBotTradesExecuted++;
+        lastPrice = currentPrice;
+
+        // Safety Guard check before running strategy triggers
+        if (!isTrading && !onCooldown && checkRiskBoundaries()) {
+            evaluateHighProbabilityStrategy();
+        }
+    }
+
+    // 3. Trade Outcome and Settlement Callback
+    if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract.contract) {
+        const contract = data.proposal_open_contract.contract;
         
-        logTerminalEntry(`[BOT] Executing Position #${totalBotTradesExecuted}: ${lastSimulatedTradeDirection} @ $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
-        
-        // 🌟 SUBMITS THE AUTHENTIC PURCHASE PAYLOAD DIRECTLY TO DERIV
-        executeLiveOrderContract(lastSimulatedTradeDirection);
+        if (contract.is_expired) {
+            const status = contract.status; // 'won' or 'lost'
+            const profit = parseFloat(contract.profit);
+            totalProfitLoss += profit;
+
+            console.log(`🏁 Position Closed! Outcome: ${status.toUpperCase()} | Net Shift: $${profit} | Total Portfolio: $${totalProfitLoss.toFixed(2)}`);
+
+            // 1-3-2-6 adjustment logic matching the unit rule tree
+            if (status === 'won') {
+                cycleIndex++;
+                if (cycleIndex >= unitPattern.length) {
+                    console.log('🎉 Full Unit Cycle Completed successfully! Resetting safely...');
+                    cycleIndex = 0; 
+                }
+            } else {
+                console.log('⚠️ Loss encountered. Capital safety rule engaged: Resetting to base 1 Unit.');
+                cycleIndex = 0; 
+            }
+
+            currentStake = BASE_UNIT * unitPattern[cycleIndex];
+            
+            // Activate Cooldown to avoid volatile market clusters
+            activateCooldown();
+        }
+    }
+
+    if (data.msg_type === 'buy') {
+        if (data.error) {
+            console.error('❌ Execution Request Denied:', data.error.message);
+            isTrading = false; 
+        } else {
+            console.log(`🚀 Automated Unit Order Filled! Tracking settlement...`);
+            ws.send(JSON.stringify({ proposal_open_contract: 1, contract_id: data.buy.contract_id }));
+        }
+    }
+};
+
+// ==========================================
+// 🧠 HIGH-THRESHOLD STRATEGY MECHANICS
+// ==========================================
+function evaluateHighProbabilityStrategy() {
+    // Increased safety threshold: requiring 5 consecutive matching directional ticks instead of 3
+    if (consecutiveUpTicks >= 5) {
+        console.log(`🎯 Condition Found: Extended Up-Trend detected. Triggering CALL contract.`);
+        executeMarketOrder('CALL');
+    } else if (consecutiveDownTicks >= 5) {
+        console.log(`🎯 Condition Found: Extended Down-Trend detected. Triggering PUT contract.`);
+        executeMarketOrder('PUT');
     }
 }
 
-// ==========================================
-// 9. LOGGING & APPLICATION RUNTIME INITIALIZATION
-// ==========================================
-function logTerminalEntry(msg, type) {
-    const el = document.getElementById("terminalLog");
-    if (!el) return;
-    const item = document.createElement("div");
-    item.className = type === "error" ? "text-rose-400" : type === "success" ? "text-emerald-400" : type === "bot" ? "text-amber-400" : "text-indigo-400";
-    item.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    el.appendChild(item);
+function executeMarketOrder(direction) {
+    isTrading = true; 
+    consecutiveUpTicks = 0;
+    consecutiveDownTicks = 0;
+
+    ws.send(JSON.stringify({
+        buy: 1,
+        price: currentStake,
+        parameters: {
+            amount: currentStake,
+            basis: 'stake',
+            contract_type: direction,
+            currency: 'USD',
+            duration: 5,
+            duration_unit: 't', // 5-tick contract
+            symbol: symbol
+        }
+    }));
+}
+
+function activateCooldown() {
+    onCooldown = true;
+    isTrading = false;
+    console.log(`⏳ Cooldown active for ${COOLDOWN_PERIOD / 1000}s to let market noise settle...`);
+    setTimeout(() => {
+        onCooldown = false;
+        console.log('⚡ Cooldown over. Scanning market again.');
+    }, COOLDOWN_PERIOD);
+}
+
+function checkRiskBoundaries() {
+    if (totalProfitLoss >= TARGET_PROFIT) {
+        console.log('💰 Session Target Profit Reached! Shutting down safely to keep winnings.');
+        ws.close();
+        return false;
+    }
+    if (totalProfitLoss <= MAX_LOSS_LIMIT) {
+        console.log('⚠️ Hard Stop-Loss Triggered! Account protected from drawdown. Shutting down bot.');
+        ws.close();
+        return false;
+    }
+    return true;
+}
+
+ws.onerror = (err) => console.error('🔌 Network Error Status:', err);
+ws.onclose = () => console.log('🛑 Bot Offline.');
+
+                
+
                                         
 
         
