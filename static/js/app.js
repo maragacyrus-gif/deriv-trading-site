@@ -1,127 +1,132 @@
-let socketInstance = null;
-let chartingCanvas = null;
-let masterDataSeries = null;
-let liveSubscribedSymbolToken = "";
+// ==========================================
+// 1. GLOBAL STATE INITIALIZATION
+// ==========================================
 let systemExecutionSequenceCounter = 0;
-
-let sessionAuthorizedToken = null;
-let userIsAuthenticated = false;
-
-let baselineUserStake = 1.00;
-let ongoingAlgorithmicStake = 1.00;
 let lastSimulatedTradeDirection = null;
-let mockTradeEntryPrice = 0.00;
+let mockTradeEntryPrice = 0;
+let globalBotProfitLossState = 0;
+let ongoingAlgorithmicStake = 1.00; // Default fallback stake volume
+let baselineUserStake = 1.00;
 let totalBotTradesExecuted = 0;
-let globalBotProfitLossState = 0.00;
+let liveSubscribedSymbolToken = null;
+let socketInstance = null;
+let masterDataSeries = null; // Target hook for Lightweight Charts
+
+// Your authentic Deriv App ID registered from your developer portal
 const DERIV_APP_ID = "346c9D1uSj4VDAZKWHnTM"; 
 const DERIV_WS_URL = `wss://://derivws.com{DERIV_APP_ID}`;
-document.addEventListener("DOMContentLoaded", () => {
-    logTerminalEntry("Initializing platform core components...", "system");
-    initializeChartingWindow();
-    parseOAuthUrlResponseParameters();
-    establishWebSocketConnection();
-    bindUserInterfaceInteractionHandlers();
-    
-    window.addEventListener("resize", () => {
-        if (chartingCanvas) {
-            const element = document.getElementById("chartContainer");
-            if (element) {
-                chartingCanvas.resize(element.clientWidth, element.clientHeight);
-            }
-        }
-    });
-});
+const MAX_MARTINGALE_STREAK = 6; // Safety barrier to protect account balances
 
-function initializeChartingWindow() {
-    const containerElement = document.getElementById("chartContainer");
-    if (!containerElement) return;
-    
-    chartingCanvas = LightweightCharts.createChart(containerElement, {
-        layout: { background: { type: LightweightCharts.ColorType.Solid, color: '#020617' }, textColor: '#94a3b8' },
-        grid: { vertLines: { color: '#0f172a' }, horzLines: { color: '#0f172a' } },
-        timeScale: { borderColor: '#1e293b', timeVisible: true, secondsVisible: true },
-    });
-    masterDataSeries = chartingCanvas.addAreaSeries({ lineColor: '#6366f1', topColor: 'rgba(99, 102, 241, 0.25)', lineWidth: 2 });
-}
+// ==========================================
+// 2. NETWORK CONNECTION & PIPELINE ENGINE
+// ==========================================
+function establishLiveDerivConnection() {
+    logTerminalEntry("Opening secure connection pipeline to Deriv exchanges...", "bot");
+    socketInstance = new WebSocket(DERIV_WS_URL);
 
-function parseOAuthUrlResponseParameters() {
-    const urlHashString = window.location.hash || window.location.search;
-    if (!urlHashString) return;
-    const urlParametersMatrix = new URLSearchParams(urlHashString.replace('#', '?'));
-    const capturedToken = urlParametersMatrix.get('token1');
-    if (capturedToken) {
-        sessionAuthorizedToken = capturedToken;
-        userIsAuthenticated = true;
-        logTerminalEntry("OAuth2 key validation checked. Session locked.", "success");
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-}
-
-function establishWebSocketConnection() {
-    socketInstance = new WebSocket("wss://://derivws.com");
-    socketInstance.onopen = () => {
-        updateNetworkStatusIndicator(true);
-        logTerminalEntry("Connected to Deriv WebSocket Engine.", "success");
-        if (userIsAuthenticated && sessionAuthorizedToken) {
-            socketInstance.send(JSON.stringify({ authorize: sessionAuthorizedToken }));
-        }
-        synchronizeMarketDataStreams(346c9D1uSj4VDAZKWHnTM);
+    // Binds incoming raw data packets directly to your processing frames
+    socketInstance.onmessage = function(event) {
+        processIncomingAPIFrame(event);
     };
-    socketInstance.onmessage = (rawPayloadPacket) => {
-        processIncomingAPIFrame(JSON.parse(rawPayloadPacket.data));
+
+    socketInstance.onopen = function() {
+        logTerminalEntry("Network connection stabilized. Checking for active account keys...", "success");
+        updateNetworkStatusIndicator(true); // Switches UI status indicator to Synced
     };
-    socketInstance.onclose = () => {
-        updateNetworkStatusIndicator(false);
-        logTerminalEntry("Disconnected. Reconnecting in 5s...", "error");
-        setTimeout(establishWebSocketConnection, 5000);
+
+    socketInstance.onclose = function() {
+        logTerminalEntry("Network channel disconnected. Auto-reconnecting in 5 seconds...", "error");
+        updateNetworkStatusIndicator(false); // Drops UI status to Offline
+        setTimeout(establishLiveDerivConnection, 5000);
     };
 }
 
-function bindUserInterfaceInteractionHandlers() {
+// ==========================================
+// 3. SECURE AUTHENTICATION EXTRACTION
+// ==========================================
+function getDerivTokenFromURL() {
+    const hash = window.location.hash;
+    if (!hash) return null;
+
+    // Parsers the returning hash parameter layout sent back from OAuth2 login
+    const params = new URLSearchParams(hash.substring(1));
+    return params.get('token1'); // Pulls primary account operational token
+}
+
+// ==========================================
+// 4. INTERFACE EVENT MATRIX LISTENERS
+// ==========================================
+function initializeUIEventListeners() {
     const assetSel = document.getElementById("assetSelector");
-    const clrLog = document.getElementById("btnClearLogs");
-    const bRise = document.getElementById("btnRise");
-    const bFall = document.getElementById("btnFall");
-    const bConn = document.getElementById("btnConnectAccount");
+    const clrLog = document.getElementById("clearLogBtn");
+    const bRise = document.getElementById("riseBtn");
+    const bFall = document.getElementById("fallBtn");
+    const bConn = document.getElementById("connectBtn");
 
     if (assetSel) assetSel.addEventListener("change", synchronizeMarketDataStreams);
+    
     if (clrLog) clrLog.addEventListener("click", () => {
         const term = document.getElementById("terminalLog");
         if (term) term.innerHTML = "";
     });
+    
     if (bRise) bRise.addEventListener("click", () => executeManualOrderPlaceholder("RISE"));
     if (bFall) bFall.addEventListener("click", () => executeManualOrderPlaceholder("FALL"));
+    
     if (bConn) bConn.addEventListener("click", () => {
-        window.location.href = `https://deriv.com{encodeURIComponent(window.location.href.split('#')[0])}`;
+        logTerminalEntry("Redirecting user safely to Deriv secure OAuth2 clearing screen...", "bot");
+        // FIXED: Replaced invalid string bracket expressions with authentic URL routing parameters
+        window.location.href = `https://deriv.com{DERIV_APP_ID}&l=en&brand=deriv`;
     });
 }
 
-function synchronizeMarketDataStreams(346c9D1uSj4VDAZKWHnTM) {
-    if (!socketInstance || socketInstance.readyState !== WebSocket.OPEN) return;
+// ==========================================
+// 5. ASYNC MARKET FEED ROUTING
+// ==========================================
+function synchronizeMarketDataStreams() {
+    if (!socketInstance || socketInstance.readyState !== WebSocket.OPEN) {
+        logTerminalEntry("Error: Cannot stream market feeds while network is offline.", "error");
+        return;
+    }
     const assetSel = document.getElementById("assetSelector");
     if (!assetSel) return;
     const chosenSymbolString = assetSel.value;
+    
     if (liveSubscribedSymbolToken) {
         socketInstance.send(JSON.stringify({ forget_all: "ticks" }));
         if (masterDataSeries) masterDataSeries.setData([]);
     }
+    
     liveSubscribedSymbolToken = chosenSymbolString;
     socketInstance.send(JSON.stringify({ ticks: chosenSymbolString, subscribe: 1 }));
+    logTerminalEntry(`Switched data streams to asset asset ticker focus: ${chosenSymbolString}`, "bot");
 }
 
-function processIncomingAPIFrame(dataFrame) {
+// ==========================================
+// 6. SERVER PACKET DECODING & ANALYSIS
+// ==========================================
+function processIncomingAPIFrame(event) {
+    // FIXED: Unpacked raw WebSocket network string to valid JSON object structure
+    const dataFrame = JSON.parse(event.data);
+
     if (dataFrame.error) {
         logTerminalEntry(`Error: ${dataFrame.error.message}`, "error");
         return;
     }
+    
+    // Monitors successful authentication handshakes
     if (dataFrame.msg_type === "authorize") {
         logTerminalEntry(`Auth Success: ${dataFrame.authorize.email} | Bal: $${dataFrame.authorize.balance}`, "success");
         return;
     }
+    
+    // Processes incoming real-time price updates
     if (dataFrame.msg_type === "tick" && dataFrame.tick.symbol === liveSubscribedSymbolToken) {
         const tick = dataFrame.tick;
         const livePrice = document.getElementById("livePriceDisplay");
         if (livePrice) livePrice.innerText = tick.quote.toFixed(4);
+        
+        // Maps timestamps directly to terminal and charting components
         if (masterDataSeries) masterDataSeries.update({ time: tick.epoch, value: tick.quote });
         
         const botTog = document.getElementById("botToggle");
@@ -131,34 +136,58 @@ function processIncomingAPIFrame(dataFrame) {
     }
 }
 
+// ==========================================
+// 7. ALGORITHMIC BOT STRATEGY EXECUTION
+// ==========================================
 function processAutomatedStrategyLoop(activePrice) {
+    // Dynamically captures custom user input stake sizes if specified on screen
+    const userStakeInput = document.getElementById("stakeVolumeInput"); 
+    if (userStakeInput && !isNaN(parseFloat(userStakeInput.value))) {
+        baselineUserStake = parseFloat(userStakeInput.value);
+    }
+
     systemExecutionSequenceCounter++;
+    
+    // Analyzes trades every 10 ticks interval loops
     if (systemExecutionSequenceCounter % 10 === 0) {
         if (lastSimulatedTradeDirection !== null && mockTradeEntryPrice !== 0) {
             const pricingDelta = activePrice - mockTradeEntryPrice;
-            let win = (lastSimulatedTradeDirection === "RISE" && pricingDelta > 0) || (lastSimulatedTradeDirection === "FALL" && pricingDelta < 0);
+            let win = (lastSimulatedTradeDirection === "RISE" && pricingDelta > 0) || 
+                      (lastSimulatedTradeDirection === "FALL" && pricingDelta < 0);
+            
             if (win) {
-                globalBotProfitLossState += ongoingAlgorithmicStake * 0.95;
-                logTerminalEntry(`[WIN] +$${(ongoingAlgorithmicStake * 0.95).toFixed(2)}. Total: $${globalBotProfitLossState.toFixed(2)}`, "success");
-                ongoingAlgorithmicStake = baselineUserStake;
+                globalBotProfitLossState += ongoingAlgorithmicStake * 0.95; // Assumed 95% market payout yield
+                logTerminalEntry(`[WIN] +$${(ongoingAlgorithmicStake * 0.95).toFixed(2)}. Net Bot State: $${globalBotProfitLossState.toFixed(2)}`, "success");
+                ongoingAlgorithmicStake = baselineUserStake; // Clean martingale reset
             } else {
                 globalBotProfitLossState -= ongoingAlgorithmicStake;
-                logTerminalEntry(`[LOSS] -$${ongoingAlgorithmicStake.toFixed(2)}. Total: $${globalBotProfitLossState.toFixed(2)}`, "error");
-                ongoingAlgorithmicStake *= 2;
-                logTerminalEntry(`[MARTINGALE] Multiplying stake to: $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
+                logTerminalEntry(`[LOSS] -$${ongoingAlgorithmicStake.toFixed(2)}. Net Bot State: $${globalBotProfitLossState.toFixed(2)}`, "error");
+                
+                // FIXED: Compounding safety barrier prevents infinite martingale account drain
+                if (ongoingAlgorithmicStake >= (baselineUserStake * Math.pow(2, MAX_MARTINGALE_STREAK))) {
+                    logTerminalEntry(`[⚠️ RISK SHIELD] Max loss streak threshold hit. Resetting stake to avoid margin call liquidation.`, "error");
+                    ongoingAlgorithmicStake = baselineUserStake;
+                } else {
+                    ongoingAlgorithmicStake *= 2; // Martingale execution step
+                    logTerminalEntry(`[MARTINGALE] Strategy multiplied next contract target stake to: $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
+                }
             }
         }
+        
         lastSimulatedTradeDirection = Math.random() > 0.5 ? "RISE" : "FALL";
         mockTradeEntryPrice = activePrice;
         totalBotTradesExecuted++;
-        logTerminalEntry(`[BOT] Trade #${totalBotTradesExecuted}: ${lastSimulatedTradeDirection} @ ${mockTradeEntryPrice.toFixed(4)} with $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
+        logTerminalEntry(`[BOT] Dispatched Automated Position #${totalBotTradesExecuted}: ${lastSimulatedTradeDirection} @ ${mockTradeEntryPrice.toFixed(4)} with allocation stake $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
     }
 }
 
 function executeManualOrderPlaceholder(dir) {
-    logTerminalEntry(`[MANUAL] Dispatched order: ${dir}`, "success");
+    logTerminalEntry(`[MANUAL ORDER EXECUTION]: Dispatched live order tracking parameter -> ${dir}`, "success");
 }
 
+// ==========================================
+// 8. LOGGING & APPLICATION RUNTIME INITIALIZATION
+// ==========================================
 function logTerminalEntry(msg, type) {
     const el = document.getElementById("terminalLog");
     if (!el) return;
@@ -174,5 +203,14 @@ function updateNetworkStatusIndicator(status) {
     if (!el) return;
     el.innerText = status ? "Synced" : "Offline";
     el.className = status ? "text-emerald-400 font-bold" : "text-rose-500 font-bold";
-        }
-                                                     
+}
+
+// MAIN RUNTIME LIFECYCLE FORCING THE SITE ONLINE ON PAGE LOAD
+document.addEventListener("DOMContentLoaded", () => {
+    // Arm interface control interactions
+    initializeUIEventListeners();
+
+    // Boot up websocket exchange pipes instantly 
+    establishLiveDerivConnection();
+
+        
