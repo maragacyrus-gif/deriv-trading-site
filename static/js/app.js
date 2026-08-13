@@ -1,7 +1,7 @@
 // ==========================================
 // ⚙️ DEFENSIVE CONFIGURATION & IDENTITY MATCH
 // ==========================================
-const DERIV_APP_ID = '346c9D1uSj4VDAZKWHnTM'; 
+const DERIV_APP_ID = 1080 
 const DERIV_API_TOKEN = 'pat_523b5c4a31cb6f052cfd9349f0793118ffca9685695f88fbcf949f47e013103a'; 
 
 const symbol = 'R_100';        // Volatility 100 Index
