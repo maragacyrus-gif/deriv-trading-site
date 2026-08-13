@@ -24,19 +24,18 @@ function establishLiveDerivConnection() {
     logTerminalEntry("Opening secure connection pipeline to Deriv exchanges...", "bot");
     socketInstance = new WebSocket(DERIV_WS_URL);
 
-    // Binds incoming raw data packets directly to your processing frames
     socketInstance.onmessage = function(event) {
         processIncomingAPIFrame(event);
     };
 
     socketInstance.onopen = function() {
         logTerminalEntry("Network connection stabilized. Checking for active account keys...", "success");
-        updateNetworkStatusIndicator(true); // Switches UI status indicator to Synced
+        updateNetworkStatusIndicator(true); 
     };
 
     socketInstance.onclose = function() {
         logTerminalEntry("Network channel disconnected. Auto-reconnecting in 5 seconds...", "error");
-        updateNetworkStatusIndicator(false); // Drops UI status to Offline
+        updateNetworkStatusIndicator(false); 
         setTimeout(establishLiveDerivConnection, 5000);
     };
 }
@@ -48,9 +47,8 @@ function getDerivTokenFromURL() {
     const hash = window.location.hash;
     if (!hash) return null;
 
-    // Parsers the returning hash parameter layout sent back from OAuth2 login
     const params = new URLSearchParams(hash.substring(1));
-    return params.get('token1'); // Pulls primary account operational token
+    return params.get('token1'); 
 }
 
 // ==========================================
@@ -70,12 +68,12 @@ function initializeUIEventListeners() {
         if (term) term.innerHTML = "";
     });
     
-    if (bRise) bRise.addEventListener("click", () => executeManualOrderPlaceholder("RISE"));
-    if (bFall) bFall.addEventListener("click", () => executeManualOrderPlaceholder("FALL"));
+    // Wire up manual buy/sell buttons to dispatch real contracts
+    if (bRise) bRise.addEventListener("click", () => executeLiveOrderContract("RISE"));
+    if (bFall) bFall.addEventListener("click", () => executeLiveOrderContract("FALL"));
     
     if (bConn) bConn.addEventListener("click", () => {
         logTerminalEntry("Redirecting user safely to Deriv secure OAuth2 clearing screen...", "bot");
-        // FIXED: Replaced invalid string bracket expressions with authentic URL routing parameters
         window.location.href = `https://deriv.com{DERIV_APP_ID}&l=en&brand=deriv`;
     });
 }
@@ -106,7 +104,6 @@ function synchronizeMarketDataStreams() {
 // 6. SERVER PACKET DECODING & ANALYSIS
 // ==========================================
 function processIncomingAPIFrame(event) {
-    // FIXED: Unpacked raw WebSocket network string to valid JSON object structure
     const dataFrame = JSON.parse(event.data);
 
     if (dataFrame.error) {
@@ -114,19 +111,22 @@ function processIncomingAPIFrame(event) {
         return;
     }
     
-    // Monitors successful authentication handshakes
     if (dataFrame.msg_type === "authorize") {
         logTerminalEntry(`Auth Success: ${dataFrame.authorize.email} | Bal: $${dataFrame.authorize.balance}`, "success");
         return;
     }
+
+    // Capture contract purchase feedback from the server
+    if (dataFrame.msg_type === "buy") {
+        logTerminalEntry(`Contract Purchased Successfully! ID: ${dataFrame.buy.contract_id} | Balance: $${dataFrame.buy.balance_after}`, "success");
+        return;
+    }
     
-    // Processes incoming real-time price updates
     if (dataFrame.msg_type === "tick" && dataFrame.tick.symbol === liveSubscribedSymbolToken) {
         const tick = dataFrame.tick;
         const livePrice = document.getElementById("livePriceDisplay");
         if (livePrice) livePrice.innerText = tick.quote.toFixed(4);
         
-        // Maps timestamps directly to terminal and charting components
         if (masterDataSeries) masterDataSeries.update({ time: tick.epoch, value: tick.quote });
         
         const botTog = document.getElementById("botToggle");
@@ -137,18 +137,51 @@ function processIncomingAPIFrame(event) {
 }
 
 // ==========================================
-// 7. ALGORITHMIC BOT STRATEGY EXECUTION
+// 7. LIVE TRANSACTION DISPATCH ENGINE
 // ==========================================
-function processAutomatedStrategyLoop(activePrice) {
-    // Dynamically captures custom user input stake sizes if specified on screen
+function executeLiveOrderContract(direction) {
+    if (!socketInstance || socketInstance.readyState !== WebSocket.OPEN) {
+        logTerminalEntry("Execution failed: Network connection is down.", "error");
+        return;
+    }
+
+    // Determine target market ticker asset or default to Volatility 10 Index
+    const assetSel = document.getElementById("assetSelector");
+    const operationalTargetSymbol = assetSel ? assetSel.value : "R_10";
+
+    // Pull custom stake value entered on screen
     const userStakeInput = document.getElementById("stakeVolumeInput"); 
     if (userStakeInput && !isNaN(parseFloat(userStakeInput.value))) {
         baselineUserStake = parseFloat(userStakeInput.value);
     }
 
+    logTerminalEntry(`[ORDER] Transmitting real contract request: ${direction} via WebSocket...`, "bot");
+
+    // Constructing the exact payload parameters requested by the Deriv API schema
+    const orderPayload = {
+        buy: 1,
+        price: ongoingAlgorithmicStake,
+        parameters: {
+            amount: ongoingAlgorithmicStake,
+            basis: "stake",
+            contract_type: direction === "RISE" ? "CALL" : "PUT",
+            currency: "USD",
+            duration: 1,
+            duration_unit: "t", // 't' runs a hyper-fast 1-tick trade contract execution
+            symbol: operationalTargetSymbol
+        }
+    };
+
+    socketInstance.send(JSON.stringify(orderPayload));
+}
+
+// ==========================================
+// 8. ALGORITHMIC BOT STRATEGY EXECUTION
+// ==========================================
+function processAutomatedStrategyLoop(activePrice) {
     systemExecutionSequenceCounter++;
     
-    // Analyzes trades every 10 ticks interval loops
+    // Evaluates local logic matrices and submits market trades every 10 ticks
     if (systemExecutionSequenceCounter % 10 === 0) {
         if (lastSimulatedTradeDirection !== null && mockTradeEntryPrice !== 0) {
             const pricingDelta = activePrice - mockTradeEntryPrice;
@@ -156,20 +189,19 @@ function processAutomatedStrategyLoop(activePrice) {
                       (lastSimulatedTradeDirection === "FALL" && pricingDelta < 0);
             
             if (win) {
-                globalBotProfitLossState += ongoingAlgorithmicStake * 0.95; // Assumed 95% market payout yield
-                logTerminalEntry(`[WIN] +$${(ongoingAlgorithmicStake * 0.95).toFixed(2)}. Net Bot State: $${globalBotProfitLossState.toFixed(2)}`, "success");
-                ongoingAlgorithmicStake = baselineUserStake; // Clean martingale reset
+                globalBotProfitLossState += ongoingAlgorithmicStake * 0.95; 
+                logTerminalEntry(`[WIN] +$${(ongoingAlgorithmicStake * 0.95).toFixed(2)}. Net Balance: $${globalBotProfitLossState.toFixed(2)}`, "success");
+                ongoingAlgorithmicStake = baselineUserStake; 
             } else {
                 globalBotProfitLossState -= ongoingAlgorithmicStake;
-                logTerminalEntry(`[LOSS] -$${ongoingAlgorithmicStake.toFixed(2)}. Net Bot State: $${globalBotProfitLossState.toFixed(2)}`, "error");
+                logTerminalEntry(`[LOSS] -$${ongoingAlgorithmicStake.toFixed(2)}. Net Balance: $${globalBotProfitLossState.toFixed(2)}`, "error");
                 
-                // FIXED: Compounding safety barrier prevents infinite martingale account drain
                 if (ongoingAlgorithmicStake >= (baselineUserStake * Math.pow(2, MAX_MARTINGALE_STREAK))) {
-                    logTerminalEntry(`[⚠️ RISK SHIELD] Max loss streak threshold hit. Resetting stake to avoid margin call liquidation.`, "error");
+                    logTerminalEntry(`[⚠️ RISK SHIELD] Maximum loss cap hit. Resetting stake to avoid margin liquidation.`, "error");
                     ongoingAlgorithmicStake = baselineUserStake;
                 } else {
-                    ongoingAlgorithmicStake *= 2; // Martingale execution step
-                    logTerminalEntry(`[MARTINGALE] Strategy multiplied next contract target stake to: $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
+                    ongoingAlgorithmicStake *= 2; 
+                    logTerminalEntry(`[MARTINGALE] Bot multiplied stake size target to: $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
                 }
             }
         }
@@ -177,16 +209,16 @@ function processAutomatedStrategyLoop(activePrice) {
         lastSimulatedTradeDirection = Math.random() > 0.5 ? "RISE" : "FALL";
         mockTradeEntryPrice = activePrice;
         totalBotTradesExecuted++;
-        logTerminalEntry(`[BOT] Dispatched Automated Position #${totalBotTradesExecuted}: ${lastSimulatedTradeDirection} @ ${mockTradeEntryPrice.toFixed(4)} with allocation stake $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
+        
+        logTerminalEntry(`[BOT] Executing Position #${totalBotTradesExecuted}: ${lastSimulatedTradeDirection} @ $${ongoingAlgorithmicStake.toFixed(2)}`, "bot");
+        
+        // 🌟 SUBMITS THE AUTHENTIC PURCHASE PAYLOAD DIRECTLY TO DERIV
+        executeLiveOrderContract(lastSimulatedTradeDirection);
     }
 }
 
-function executeManualOrderPlaceholder(dir) {
-    logTerminalEntry(`[MANUAL ORDER EXECUTION]: Dispatched live order tracking parameter -> ${dir}`, "success");
-}
-
 // ==========================================
-// 8. LOGGING & APPLICATION RUNTIME INITIALIZATION
+// 9. LOGGING & APPLICATION RUNTIME INITIALIZATION
 // ==========================================
 function logTerminalEntry(msg, type) {
     const el = document.getElementById("terminalLog");
@@ -195,22 +227,6 @@ function logTerminalEntry(msg, type) {
     item.className = type === "error" ? "text-rose-400" : type === "success" ? "text-emerald-400" : type === "bot" ? "text-amber-400" : "text-indigo-400";
     item.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
     el.appendChild(item);
-    el.scrollTop = el.scrollHeight;
-}
-
-function updateNetworkStatusIndicator(status) {
-    const el = document.getElementById("connectionStatus");
-    if (!el) return;
-    el.innerText = status ? "Synced" : "Offline";
-    el.className = status ? "text-emerald-400 font-bold" : "text-rose-500 font-bold";
-}
-
-// MAIN RUNTIME LIFECYCLE FORCING THE SITE ONLINE ON PAGE LOAD
-document.addEventListener("DOMContentLoaded", () => {
-    // Arm interface control interactions
-    initializeUIEventListeners();
-
-    // Boot up websocket exchange pipes instantly 
-    establishLiveDerivConnection();
+                                        
 
         
