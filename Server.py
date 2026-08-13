@@ -1,18 +1,13 @@
 import os
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from flask import Flask, render_template
 
-app = FastAPI(title="Custom Deriv Trading Platform")
+app = Flask(__name__, static_folder='static', template_folder='templates')
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("server.py:app", host="127.0.0.1", port=8000, reload=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+    
